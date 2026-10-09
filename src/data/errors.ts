@@ -8,6 +8,7 @@ export const MESSAGES = {
   emailTaken: 'An account with this email already exists.',
   tooManyEmails: 'Too many emails sent. Please wait a minute and try again.',
   deckNotFound: 'This deck no longer exists.',
+  cardNotFound: 'This card no longer exists.',
   generic: 'Something went wrong. Please try again.',
 } as const;
 

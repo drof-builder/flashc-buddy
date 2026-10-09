@@ -5,8 +5,10 @@ import { authRepo } from '@/data/authRepo';
 import { useDecks } from '@/features/decks/useDecks';
 import { confirm } from '@/ui/confirm';
 
+const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
+  useFocusEffect: jest.fn(),
 }));
 jest.mock('@/features/decks/useDecks', () => ({ useDecks: jest.fn() }));
 jest.mock('@/data/authRepo', () => ({ authRepo: { signOut: jest.fn() } }));
@@ -25,6 +27,7 @@ function hookState(overrides: Partial<ReturnType<typeof useDecks>> = {}) {
     loading: false,
     error: null,
     refresh: jest.fn(),
+    reload: jest.fn(),
     create: jest.fn().mockResolvedValue(null),
     rename: jest.fn().mockResolvedValue(null),
     remove: jest.fn().mockResolvedValue(null),
@@ -139,4 +142,16 @@ it('stays logged in when log out is cancelled', async () => {
   await fireEvent.press(screen.getByRole('button', { name: 'Log out' }));
 
   expect(signOut).not.toHaveBeenCalled();
+});
+
+it('opens a deck when tapped', async () => {
+  hookState();
+  await render(<DeckListScreen />);
+
+  await fireEvent.press(screen.getByRole('button', { name: 'Open Biology' }));
+
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/deck/[deckId]',
+    params: { deckId: 'd1', name: 'Biology' },
+  });
 });

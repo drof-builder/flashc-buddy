@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -10,11 +11,14 @@ import { confirm } from '@/ui/confirm';
 import { Screen } from '@/ui/Screen';
 import { colors } from '@/ui/theme';
 import { showToast } from '@/ui/Toast';
+import { useReloadOnFocus } from '@/ui/useReloadOnFocus';
 
 const cardsLabel = (n: number) => (n === 1 ? '1 card' : `${n} cards`);
 
 export default function DeckListScreen() {
-  const { decks, loading, error, refresh, create, rename, remove } = useDecks();
+  const router = useRouter();
+  const { decks, loading, error, refresh, reload, create, rename, remove } = useDecks();
+  useReloadOnFocus(reload); // card counts change after visiting a deck
   const [creating, setCreating] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
 
@@ -80,10 +84,20 @@ export default function DeckListScreen() {
           />
         ) : (
           <View key={deck.id} style={styles.deck}>
-            <View style={styles.deckText}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${deck.name}`}
+              onPress={() =>
+                router.push({
+                  pathname: '/deck/[deckId]',
+                  params: { deckId: deck.id, name: deck.name },
+                })
+              }
+              style={styles.deckText}
+            >
               <Text style={styles.deckName}>{deck.name}</Text>
               <Text style={styles.deckCount}>{cardsLabel(deck.cardCount)}</Text>
-            </View>
+            </Pressable>
             <SmallButton label="Rename" name={deck.name} onPress={() => setRenamingId(deck.id)} />
             <SmallButton label="Delete" name={deck.name} onPress={() => onDelete(deck)} danger />
           </View>

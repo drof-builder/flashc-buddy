@@ -57,5 +57,5 @@ export function useDecks() {
   );
   const remove = useCallback((id: string) => mutate(() => decksRepo.deleteDeck(id)), [mutate]);
 
-  return { decks, loading, error, refresh, create, rename, remove };
+  return { decks, loading, error, refresh, reload: load, create, rename, remove };
 }
