@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { authRepo } from '@/data/authRepo';
 import type { Deck } from '@/domain/types';
@@ -21,6 +21,19 @@ export default function DeckListScreen() {
   useReloadOnFocus(reload); // card counts change after visiting a deck
   const [creating, setCreating] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+
+  // Android Back closes an open New/Rename form instead of leaving the app.
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (!creating && renamingId === null) return false;
+        setCreating(false);
+        setRenamingId(null);
+        return true;
+      });
+      return () => sub.remove();
+    }, [creating, renamingId]),
+  );
 
   const onCreate = async (name: string) => {
     const err = await create(name);

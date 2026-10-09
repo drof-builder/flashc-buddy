@@ -1,12 +1,14 @@
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 
 import { authRepo } from '@/data/authRepo';
+import { goToLogin } from '@/features/auth/goToLogin';
 import { validateEmail, validatePassword, validatePasswordsMatch } from '@/domain/validation';
 import { Button } from '@/ui/Button';
 import { Screen } from '@/ui/Screen';
 import { TextField } from '@/ui/TextField';
+import { TextLink } from '@/ui/TextLink';
 import { colors } from '@/ui/theme';
 import { useBusy } from '@/ui/useBusy';
 
@@ -69,14 +71,11 @@ export default function SignUpScreen() {
       />
       {formError ? <Text style={styles.formError}>{formError}</Text> : null}
       <Button title="Sign up" onPress={onSubmit} loading={busy} />
-      <Link href="/login" replace style={styles.link}>
-        Already have an account? Log in
-      </Link>
+      <TextLink title="Already have an account? Log in" onPress={() => goToLogin(router)} />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   formError: { color: colors.error, fontSize: 15 },
-  link: { color: colors.primary, textAlign: 'center', paddingVertical: 8 },
 });

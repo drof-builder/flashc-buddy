@@ -4,13 +4,17 @@ import { authRepo } from '@/data/authRepo';
 
 import SignUpScreen from '@/app/(auth)/signup';
 
+const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockBack = jest.fn();
+let mockCanGoBack = true;
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockReplace, push: jest.fn(), back: jest.fn() }),
-  Link: ({ children }: { children: React.ReactNode }) => {
-    const { Text } = jest.requireActual('react-native');
-    return <Text>{children}</Text>;
-  },
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+    back: mockBack,
+    canGoBack: () => mockCanGoBack,
+  }),
 }));
 jest.mock('@/data/authRepo', () => ({ authRepo: { signUp: jest.fn() } }));
 
@@ -22,7 +26,10 @@ async function fillForm(email: string, password: string, confirm: string) {
   await fireEvent.changeText(screen.getByLabelText('Confirm password'), confirm);
 }
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockCanGoBack = true;
+});
 
 it("shows Passwords don't match. and sends nothing", async () => {
   await render(<SignUpScreen />);
@@ -62,4 +69,19 @@ it('shows the server error message', async () => {
   await fireEvent.press(screen.getByRole('button', { name: 'Sign up' }));
 
   expect(await screen.findByText('An account with this email already exists.')).toBeTruthy();
+});
+
+it('"Log in" goes back to the log-in screen underneath', async () => {
+  await render(<SignUpScreen />);
+  await fireEvent.press(screen.getByRole('link', { name: 'Already have an account? Log in' }));
+
+  expect(mockBack).toHaveBeenCalled();
+});
+
+it('"Log in" opens the log-in screen when there is nothing to go back to', async () => {
+  mockCanGoBack = false;
+  await render(<SignUpScreen />);
+  await fireEvent.press(screen.getByRole('link', { name: 'Already have an account? Log in' }));
+
+  expect(mockReplace).toHaveBeenCalledWith('/login');
 });
