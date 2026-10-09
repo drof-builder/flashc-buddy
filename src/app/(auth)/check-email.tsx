@@ -1,5 +1,4 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 
 import { authRepo } from '@/data/authRepo';
@@ -10,6 +9,7 @@ import { TextLink } from '@/ui/TextLink';
 import { colors } from '@/ui/theme';
 import { showToast } from '@/ui/Toast';
 import { useBusy } from '@/ui/useBusy';
+import { useCooldown, withCountdown } from '@/ui/useCooldown';
 
 const COOLDOWN_SECONDS = 60;
 
@@ -17,21 +17,15 @@ export default function CheckEmailScreen() {
   const router = useRouter();
   const { email = '' } = useLocalSearchParams<{ email?: string }>();
   // The first email was just sent by sign up, so start in cooldown.
-  const [secondsLeft, setSecondsLeft] = useState(COOLDOWN_SECONDS);
+  const cooldown = useCooldown(COOLDOWN_SECONDS, { startActive: true });
   const { busy, run } = useBusy();
-
-  useEffect(() => {
-    if (secondsLeft <= 0) return;
-    const timer = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [secondsLeft]);
 
   const onResend = () =>
     run(async () => {
       const result = await authRepo.resendConfirmation(email);
       if (result.ok) {
         showToast('Confirmation email sent.');
-        setSecondsLeft(COOLDOWN_SECONDS);
+        cooldown.start();
       } else {
         showToast(result.error);
       }
@@ -46,10 +40,10 @@ export default function CheckEmailScreen() {
       </Text>
       {email ? (
         <Button
-          title={secondsLeft > 0 ? `Resend email (${secondsLeft}s)` : 'Resend email'}
+          title={withCountdown('Resend email', cooldown.secondsLeft)}
           variant="secondary"
           onPress={onResend}
-          disabled={secondsLeft > 0}
+          disabled={cooldown.secondsLeft > 0}
           loading={busy}
         />
       ) : (

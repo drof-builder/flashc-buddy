@@ -70,3 +70,19 @@ it('opens sign-up on top of log in, so Back returns here', async () => {
   expect(mockPush).toHaveBeenCalledWith('/signup');
   expect(mockReplace).not.toHaveBeenCalled();
 });
+
+it('resends to the email that needs confirming, then waits 60 s before allowing another', async () => {
+  signIn.mockResolvedValue({ ok: false, error: 'Please confirm your email first' });
+  resend.mockResolvedValue({ ok: true, data: undefined });
+  await render(<LoginScreen />);
+  await logIn('me@example.com', 'password1');
+  await screen.findByText('Please confirm your email first');
+
+  // The user edits the email field afterwards: still resend to the right address.
+  await fireEvent.changeText(screen.getByLabelText('Email'), 'typo@example.com');
+  await fireEvent.press(screen.getByRole('button', { name: 'Resend email' }));
+
+  expect(resend).toHaveBeenCalledWith('me@example.com');
+  const button = await screen.findByRole('button', { name: 'Resend email (60s)' });
+  expect(button).toBeDisabled();
+});

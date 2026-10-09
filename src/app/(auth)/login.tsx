@@ -12,6 +12,7 @@ import { TextLink } from '@/ui/TextLink';
 import { colors } from '@/ui/theme';
 import { showToast } from '@/ui/Toast';
 import { useBusy } from '@/ui/useBusy';
+import { useCooldown, withCountdown } from '@/ui/useCooldown';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -20,6 +21,9 @@ export default function LoginScreen() {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  // The address that needs confirming (the user may edit the field afterwards).
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState('');
+  const cooldown = useCooldown(60);
   const login = useBusy();
   const resend = useBusy();
 
@@ -35,12 +39,16 @@ export default function LoginScreen() {
       if (eErr || pErr) return;
 
       const result = await authRepo.signIn(email, password);
-      if (!result.ok) setFormError(result.error);
+      if (!result.ok) {
+        setFormError(result.error);
+        if (result.error === MESSAGES.emailNotConfirmed) setUnconfirmedEmail(email.trim());
+      }
     });
 
   const onResend = () =>
     resend.run(async () => {
-      const result = await authRepo.resendConfirmation(email);
+      const result = await authRepo.resendConfirmation(unconfirmedEmail);
+      if (result.ok) cooldown.start();
       showToast(result.ok ? 'Confirmation email sent.' : result.error);
     });
 
@@ -67,7 +75,13 @@ export default function LoginScreen() {
       />
       {formError ? <Text style={styles.formError}>{formError}</Text> : null}
       {needsConfirmation ? (
-        <Button title="Resend email" variant="secondary" onPress={onResend} loading={resend.busy} />
+        <Button
+          title={withCountdown('Resend email', cooldown.secondsLeft)}
+          variant="secondary"
+          onPress={onResend}
+          disabled={cooldown.secondsLeft > 0}
+          loading={resend.busy}
+        />
       ) : null}
       <Button title="Log in" onPress={onSubmit} loading={login.busy} />
       <TextLink title="New here? Create an account" onPress={() => router.push('/signup')} />
