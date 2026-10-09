@@ -30,3 +30,14 @@ Create User A and User B. As User A, create deck "A's deck" with 2 cards.
 | B | Add a card with A's `deck_id` | error `deck not found` | ☐ |
 | A | Delete own deck | deck and its 2 cards gone | ☐ |
 | A | Create deck named `"   "` | rejected by check constraint | ☐ |
+
+## Migration 20261011000000 (tighten checks, server timestamps) — 2026-10-11 ✅
+Applied via SQL Editor. Verified in a rolled-back test block (no data left behind):
+| Check | Expected | Result |
+|---|---|---|
+| Existing constraint names | `decks_name_check`, `cards_front_check`, `cards_back_check` | ✅ |
+| Client-sent `created_at` on insert | ignored (set to now) | ✅ |
+| `created_at` changed on update | kept unchanged | ✅ |
+| Deck name `E'\n'` (newline only) | rejected | ✅ |
+| Deck name `E'\t '` (tab + space) | rejected | ✅ |
+| Anonymous read of decks / cards | refused | ✅ 401 / 401 |
