@@ -29,6 +29,7 @@ For "offline" items, turn on **airplane mode**.
 | 2.4 | Success → deck list with all my decks | — | ☐ |
 | 2.5 | Close and reopen the app → still logged in | — | ☐ |
 | 2.6 | Leave app in background 1+ hour, reopen → still logged in | — | ☐ |
+| 2.7 | Close app 1+ hour, open it in **airplane mode** → still on decks (shows "No connection"), not login | ✅ | ☐ |
 
 ## Story 3 — Log out
 | # | Criterion | Auto | Phone |
@@ -36,6 +37,7 @@ For "offline" items, turn on **airplane mode**.
 | 3.1 | "Log out" button on the deck list | ✅ | ☐ |
 | 3.2 | Asks "Log out?" with Cancel / Log out | ✅ | ☐ |
 | 3.3 | After logging out, Back does not return to decks | — | ☐ |
+| 3.4 | In **airplane mode** after 1+ hour, Log out still logs out | ✅ | ☐ |
 
 ## Story 4 — Create a deck
 | # | Criterion | Auto | Phone |
@@ -85,9 +87,10 @@ For "offline" items, turn on **airplane mode**.
 |---|---|---|---|
 | A.1 | Only my own decks and cards (database-enforced) | see `rls-check.md` | ☐ two-user check |
 | A.2 | Offline actions show a clear message, never freeze | ✅ | ☐ |
+| A.3 | Very slow / stalled network: Save gives up after ~15 s with a message, not an endless spinner | ✅ | ☐ |
 
 ## Automated checks (Claude, 2026-10-10)
-- `npm test` — 91 tests passing
+- `npm test` — 98 tests passing (after final-review fixes)
 - `npm run typecheck` — passing
 - `npm run lint` — passing
 - `npx expo export --platform android` — bundles (1324 modules)

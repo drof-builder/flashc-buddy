@@ -3,6 +3,7 @@
 
 export const MESSAGES = {
   noConnection: "No connection. Try again when you're online.",
+  timeout: 'The connection is too slow right now. Please try again.',
   invalidCredentials: 'Incorrect email or password.',
   emailNotConfirmed: 'Please confirm your email first',
   emailTaken: 'An account with this email already exists.',
@@ -35,6 +36,7 @@ function isNetworkError(error: ErrorLike): boolean {
 export function toUserMessage(error: unknown): string {
   if (error && typeof error === 'object') {
     const e = error as ErrorLike;
+    if (e.name === 'TimeoutError') return MESSAGES.timeout;
     if (isNetworkError(e)) return MESSAGES.noConnection;
     if (typeof e.code === 'string' && BY_CODE[e.code]) return BY_CODE[e.code];
     // Raised by the set_card_user_id trigger when the deck is gone or not yours.

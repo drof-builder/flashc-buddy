@@ -1,8 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { authRepo } from './authRepo';
 import { isOnline } from './network';
 import { supabase } from './supabaseClient';
 
 jest.mock('./supabaseClient', () => ({
+  AUTH_STORAGE_KEY: 'test-auth',
   supabase: {
     auth: {
       signUp: jest.fn(),
@@ -14,7 +17,12 @@ jest.mock('./supabaseClient', () => ({
   },
 }));
 jest.mock('./network', () => ({ isOnline: jest.fn() }));
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: { getItem: jest.fn(), removeItem: jest.fn() },
+}));
 
+const storage = AsyncStorage as unknown as Record<string, jest.Mock>;
 const auth = supabase.auth as unknown as Record<string, jest.Mock>;
 const online = isOnline as jest.Mock;
 const NO_CONNECTION = "No connection. Try again when you're online.";
@@ -77,11 +85,30 @@ describe('authRepo.signOut', () => {
     expect(auth.signOut).toHaveBeenCalledWith();
   });
 
-  it('still signs out on this phone when offline', async () => {
+  it('offline: forgets the saved login first, then signs out on this phone', async () => {
+    // With an expired token offline, supabase-js would fail to refresh and
+    // return early WITHOUT clearing the session — so clear storage ourselves.
     online.mockResolvedValue(false);
     auth.signOut.mockResolvedValue({ error: null });
+
     await expect(authRepo.signOut()).resolves.toEqual({ ok: true, data: undefined });
+
+    expect(storage.removeItem).toHaveBeenCalledWith('test-auth');
+    expect(storage.removeItem).toHaveBeenCalledWith('test-auth-user');
     expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+    const cleared = storage.removeItem.mock.invocationCallOrder[0];
+    expect(cleared).toBeLessThan(auth.signOut.mock.invocationCallOrder[0]);
+  });
+
+  it('online but the server call fails: still logs out on this phone', async () => {
+    auth.signOut
+      .mockResolvedValueOnce({ error: { name: 'AuthRetryableFetchError' } })
+      .mockResolvedValueOnce({ error: null });
+
+    await expect(authRepo.signOut()).resolves.toEqual({ ok: true, data: undefined });
+
+    expect(storage.removeItem).toHaveBeenCalledWith('test-auth');
+    expect(auth.signOut).toHaveBeenLastCalledWith({ scope: 'local' });
   });
 });
 
@@ -113,5 +140,38 @@ describe('authRepo.onSessionChange', () => {
 
     expect(cb.mock.calls).toEqual([[true], [false]]);
     expect(unsubscribe).toHaveBeenCalled();
+  });
+
+  it('opening the app offline with a saved (expired) login counts as signed in', async () => {
+    // supabase-js reports INITIAL_SESSION null when it can't refresh offline,
+    // but keeps the saved login. Trust the saved login until it's really gone.
+    let listener: (event: string, session: unknown) => Promise<void> | void = () => {};
+    auth.onAuthStateChange.mockImplementation((cb) => {
+      listener = cb;
+      return { data: { subscription: { unsubscribe: jest.fn() } } };
+    });
+    storage.getItem.mockResolvedValue('{"refresh_token":"r"}');
+    const cb = jest.fn();
+
+    authRepo.onSessionChange(cb);
+    await listener('INITIAL_SESSION', null);
+
+    expect(storage.getItem).toHaveBeenCalledWith('test-auth');
+    expect(cb).toHaveBeenCalledWith(true);
+  });
+
+  it('opening the app with no saved login counts as signed out', async () => {
+    let listener: (event: string, session: unknown) => Promise<void> | void = () => {};
+    auth.onAuthStateChange.mockImplementation((cb) => {
+      listener = cb;
+      return { data: { subscription: { unsubscribe: jest.fn() } } };
+    });
+    storage.getItem.mockResolvedValue(null);
+    const cb = jest.fn();
+
+    authRepo.onSessionChange(cb);
+    await listener('INITIAL_SESSION', null);
+
+    expect(cb).toHaveBeenCalledWith(false);
   });
 });

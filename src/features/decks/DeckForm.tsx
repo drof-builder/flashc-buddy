@@ -32,7 +32,7 @@ export function DeckForm({ initialName = '', onSubmit, onCancel }: Props) {
       <TextField label="Deck name" value={name} onChangeText={setName} error={error} />
       <View style={styles.row}>
         <View style={styles.flex}>
-          <Button title="Cancel" variant="secondary" onPress={onCancel} disabled={busy} />
+          <Button title="Cancel" variant="secondary" onPress={onCancel} />
         </View>
         <View style={styles.flex}>
           <Button title="Save" onPress={save} loading={busy} />

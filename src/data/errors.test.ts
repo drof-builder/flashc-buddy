@@ -42,6 +42,12 @@ describe('toUserMessage', () => {
     );
   });
 
+  it('maps a request that timed out (stalled connection)', () => {
+    const error = new Error('timed out');
+    error.name = 'TimeoutError';
+    expect(toUserMessage(error)).toBe(MESSAGES.timeout);
+  });
+
   it('falls back to a generic message and logs the original', () => {
     expect(toUserMessage('weird')).toBe('Something went wrong. Please try again.');
     expect(console.error).toHaveBeenCalledWith('weird');
