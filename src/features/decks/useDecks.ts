@@ -1,6 +1,6 @@
 // Screen state for the deck list: the decks, loading, error, and actions.
 // Mutations return null on success or the message to show.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { decksRepo } from '@/data/decksRepo';
 import type { Deck, Result } from '@/domain/types';
@@ -20,7 +20,19 @@ export function useDecks() {
     setLoading(false);
   }, []);
 
-  const load = useCallback(async () => apply(await decksRepo.listDecks()), [apply]);
+  // Each fetch gets a number; only the newest one may update the list, so a
+  // slow older answer can't overwrite a newer one (e.g. hide a new item).
+  const latest = useRef(0);
+  const fetchLatest = useCallback(async (): Promise<Result<Deck[]> | null> => {
+    const id = ++latest.current;
+    const result = await decksRepo.listDecks();
+    return id === latest.current ? result : null;
+  }, []);
+
+  const load = useCallback(async () => {
+    const result = await fetchLatest();
+    if (result) apply(result);
+  }, [apply, fetchLatest]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -31,13 +43,13 @@ export function useDecks() {
   // closed before it arrived.
   useEffect(() => {
     let active = true;
-    decksRepo.listDecks().then((result) => {
-      if (active) apply(result);
+    fetchLatest().then((result) => {
+      if (active && result) apply(result);
     });
     return () => {
       active = false;
     };
-  }, [apply]);
+  }, [apply, fetchLatest]);
 
   // Run a change, then reload the list so counts and order stay correct.
   const mutate = useCallback(
