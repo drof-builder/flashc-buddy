@@ -65,3 +65,21 @@ it('remove returns the error message and keeps the list on failure', async () =>
   expect(outcome).toBe('No connection.');
   expect(result.current.decks).toEqual([deck]);
 });
+
+it('ignores an older, slower load that finishes after a newer one', async () => {
+  // First load is slow; a reload (e.g. after creating a deck) answers first.
+  let finishFirst: (value: unknown) => void = () => {};
+  repo.listDecks.mockReturnValueOnce(new Promise((resolve) => (finishFirst = resolve)));
+  repo.listDecks.mockResolvedValueOnce({ ok: true, data: [deck] });
+  const { result } = await renderHook(() => useDecks());
+
+  await act(async () => {
+    await result.current.reload();
+  });
+  expect(result.current.decks).toEqual([deck]);
+
+  await act(async () => {
+    finishFirst({ ok: true, data: [] }); // stale answer from before the deck existed
+  });
+  expect(result.current.decks).toEqual([deck]);
+});

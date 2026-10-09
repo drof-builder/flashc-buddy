@@ -4,12 +4,17 @@ import { authRepo } from '@/data/authRepo';
 
 import LoginScreen from '@/app/(auth)/login';
 
+const mockPush = jest.fn();
+const mockReplace = jest.fn();
+const mockBack = jest.fn();
+let mockCanGoBack = true;
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: jest.fn(), push: jest.fn(), back: jest.fn() }),
-  Link: ({ children }: { children: React.ReactNode }) => {
-    const { Text } = jest.requireActual('react-native');
-    return <Text>{children}</Text>;
-  },
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+    back: mockBack,
+    canGoBack: () => mockCanGoBack,
+  }),
 }));
 jest.mock('@/data/authRepo', () => ({
   authRepo: { signIn: jest.fn(), resendConfirmation: jest.fn() },
@@ -25,7 +30,10 @@ async function logIn(email: string, password: string) {
   await fireEvent.press(screen.getByRole('button', { name: 'Log in' }));
 }
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockCanGoBack = true;
+});
 
 it('shows the wrong-credentials message', async () => {
   signIn.mockResolvedValue({ ok: false, error: 'Incorrect email or password.' });
@@ -53,4 +61,28 @@ it('does not call signIn with an empty password', async () => {
 
   expect(screen.getByText('Enter your password.')).toBeTruthy();
   expect(signIn).not.toHaveBeenCalled();
+});
+
+it('opens sign-up on top of log in, so Back returns here', async () => {
+  await render(<LoginScreen />);
+  await fireEvent.press(screen.getByRole('link', { name: 'New here? Create an account' }));
+
+  expect(mockPush).toHaveBeenCalledWith('/signup');
+  expect(mockReplace).not.toHaveBeenCalled();
+});
+
+it('resends to the email that needs confirming, then waits 60 s before allowing another', async () => {
+  signIn.mockResolvedValue({ ok: false, error: 'Please confirm your email first' });
+  resend.mockResolvedValue({ ok: true, data: undefined });
+  await render(<LoginScreen />);
+  await logIn('me@example.com', 'password1');
+  await screen.findByText('Please confirm your email first');
+
+  // The user edits the email field afterwards: still resend to the right address.
+  await fireEvent.changeText(screen.getByLabelText('Email'), 'typo@example.com');
+  await fireEvent.press(screen.getByRole('button', { name: 'Resend email' }));
+
+  expect(resend).toHaveBeenCalledWith('me@example.com');
+  const button = await screen.findByRole('button', { name: 'Resend email (60s)' });
+  expect(button).toBeDisabled();
 });

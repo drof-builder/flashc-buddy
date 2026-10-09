@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { BackHandler } from 'react-native';
 
 import DeckListScreen from '@/app/(main)/index';
 import { authRepo } from '@/data/authRepo';
@@ -8,7 +9,11 @@ import { confirm } from '@/ui/confirm';
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
-  useFocusEffect: jest.fn(),
+  // Run focus effects like normal effects, so Back handlers get registered.
+  useFocusEffect: (effect: () => void | (() => void)) => {
+    const { useEffect } = jest.requireActual('react');
+    useEffect(effect, [effect]);
+  },
 }));
 jest.mock('@/features/decks/useDecks', () => ({ useDecks: jest.fn() }));
 jest.mock('@/data/authRepo', () => ({ authRepo: { signOut: jest.fn() } }));
@@ -154,4 +159,24 @@ it('opens a deck when tapped', async () => {
     pathname: '/deck/[deckId]',
     params: { deckId: 'd1', name: 'Biology' },
   });
+});
+
+it('Android Back closes an open New deck form instead of leaving the app', async () => {
+  hookState();
+  let onBack: (...args: never[]) => boolean | null | undefined = () => false;
+  jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, handler) => {
+    onBack = handler;
+    return { remove: jest.fn() };
+  });
+  await render(<DeckListScreen />);
+  await fireEvent.press(screen.getByRole('button', { name: 'New deck' }));
+  expect(screen.getByLabelText('Deck name')).toBeTruthy();
+
+  let handled: boolean | null | undefined;
+  await act(async () => {
+    handled = onBack();
+  });
+
+  expect(handled).toBe(true);
+  expect(screen.queryByLabelText('Deck name')).toBeNull();
 });

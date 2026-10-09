@@ -1,34 +1,31 @@
-import { Link, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, Text } from 'react-native';
 
 import { authRepo } from '@/data/authRepo';
+import { goToLogin } from '@/features/auth/goToLogin';
 import { Button } from '@/ui/Button';
 import { Screen } from '@/ui/Screen';
+import { TextLink } from '@/ui/TextLink';
 import { colors } from '@/ui/theme';
 import { showToast } from '@/ui/Toast';
 import { useBusy } from '@/ui/useBusy';
+import { useCooldown, withCountdown } from '@/ui/useCooldown';
 
 const COOLDOWN_SECONDS = 60;
 
 export default function CheckEmailScreen() {
+  const router = useRouter();
   const { email = '' } = useLocalSearchParams<{ email?: string }>();
   // The first email was just sent by sign up, so start in cooldown.
-  const [secondsLeft, setSecondsLeft] = useState(COOLDOWN_SECONDS);
+  const cooldown = useCooldown(COOLDOWN_SECONDS, { startActive: true });
   const { busy, run } = useBusy();
-
-  useEffect(() => {
-    if (secondsLeft <= 0) return;
-    const timer = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [secondsLeft]);
 
   const onResend = () =>
     run(async () => {
       const result = await authRepo.resendConfirmation(email);
       if (result.ok) {
         showToast('Confirmation email sent.');
-        setSecondsLeft(COOLDOWN_SECONDS);
+        cooldown.start();
       } else {
         showToast(result.error);
       }
@@ -41,16 +38,19 @@ export default function CheckEmailScreen() {
         We sent a confirmation link to {email || 'your email address'}. Open it to confirm your
         account. It may open in your phone&apos;s browser — after that, come back here and log in.
       </Text>
-      <Button
-        title={secondsLeft > 0 ? `Resend email (${secondsLeft}s)` : 'Resend email'}
-        variant="secondary"
-        onPress={onResend}
-        disabled={secondsLeft > 0}
-        loading={busy}
-      />
-      <Link href="/login" replace style={styles.link}>
-        Back to log in
-      </Link>
+      {email ? (
+        <Button
+          title={withCountdown('Resend email', cooldown.secondsLeft)}
+          variant="secondary"
+          onPress={onResend}
+          disabled={cooldown.secondsLeft > 0}
+          loading={busy}
+        />
+      ) : (
+        // Reached without an address (e.g. app restored here): we can't resend.
+        <Text style={styles.body}>Go back and log in to resend the email.</Text>
+      )}
+      <TextLink title="Back to log in" onPress={() => goToLogin(router)} />
     </Screen>
   );
 }
@@ -58,5 +58,4 @@ export default function CheckEmailScreen() {
 const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', color: colors.text },
   body: { fontSize: 16, lineHeight: 22, color: colors.text },
-  link: { color: colors.primary, textAlign: 'center', paddingVertical: 8 },
 });
