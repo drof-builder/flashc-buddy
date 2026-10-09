@@ -8,6 +8,7 @@ import { confirm } from '@/ui/confirm';
 import { Screen } from '@/ui/Screen';
 import { colors } from '@/ui/theme';
 import { showToast } from '@/ui/Toast';
+import { useBusy } from '@/ui/useBusy';
 import { useReloadOnFocus } from '@/ui/useReloadOnFocus';
 
 export default function DeckDetailScreen() {
@@ -22,16 +23,20 @@ export default function DeckDetailScreen() {
       params: cardId ? { deckId, cardId } : { deckId },
     });
 
-  const onDelete = async (card: Card) => {
-    const yes = await confirm(
-      'Delete card?',
-      'This card and its study history will be removed.',
-      'Delete',
-    );
-    if (!yes) return;
-    const err = await remove(card.id);
-    if (err) showToast(err);
-  };
+  // One delete at a time: a second tap while deleting is ignored.
+  const deleting = useBusy();
+
+  const onDelete = (card: Card) =>
+    deleting.run(async () => {
+      const yes = await confirm(
+        'Delete card?',
+        'This card and its study history will be removed.',
+        'Delete',
+      );
+      if (!yes) return;
+      const err = await remove(card.id);
+      if (err) showToast(err);
+    });
 
   return (
     <Screen>
@@ -65,8 +70,11 @@ export default function DeckDetailScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Delete card ${card.front}`}
+            accessibilityState={{ disabled: deleting.busy }}
+            disabled={deleting.busy}
             onPress={() => onDelete(card)}
             hitSlop={8}
+            style={deleting.busy && styles.inactive}
           >
             <Text style={styles.delete}>Delete</Text>
           </Pressable>
@@ -94,4 +102,5 @@ const styles = StyleSheet.create({
   front: { fontSize: 16, fontWeight: '600', color: colors.text },
   back: { fontSize: 15, color: colors.muted },
   delete: { color: colors.danger, fontSize: 14, fontWeight: '600' },
+  inactive: { opacity: 0.5 },
 });

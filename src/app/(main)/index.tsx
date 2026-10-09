@@ -11,6 +11,7 @@ import { confirm } from '@/ui/confirm';
 import { Screen } from '@/ui/Screen';
 import { colors } from '@/ui/theme';
 import { showToast } from '@/ui/Toast';
+import { useBusy } from '@/ui/useBusy';
 import { useReloadOnFocus } from '@/ui/useReloadOnFocus';
 
 const cardsLabel = (n: number) => (n === 1 ? '1 card' : `${n} cards`);
@@ -47,24 +48,30 @@ export default function DeckListScreen() {
     return err;
   };
 
-  const onDelete = async (deck: Deck) => {
-    const yes = await confirm(
-      'Delete deck?',
-      `Delete '${deck.name}' and its ${cardsLabel(deck.cardCount)}? This can't be undone.`,
-      'Delete',
-    );
-    if (!yes) return;
-    const err = await remove(deck.id);
-    if (err) showToast(err);
-  };
+  // One action at a time: a second tap while deleting / logging out is ignored.
+  const deleting = useBusy();
+  const loggingOut = useBusy();
 
-  const onLogOut = async () => {
-    const yes = await confirm('Log out?', 'You can log back in any time.', 'Log out');
-    if (!yes) return;
-    const result = await authRepo.signOut();
-    // On success the root layout swaps to the login screen by itself.
-    if (!result.ok) showToast(result.error);
-  };
+  const onDelete = (deck: Deck) =>
+    deleting.run(async () => {
+      const yes = await confirm(
+        'Delete deck?',
+        `Delete '${deck.name}' and its ${cardsLabel(deck.cardCount)}? This can't be undone.`,
+        'Delete',
+      );
+      if (!yes) return;
+      const err = await remove(deck.id);
+      if (err) showToast(err);
+    });
+
+  const onLogOut = () =>
+    loggingOut.run(async () => {
+      const yes = await confirm('Log out?', 'You can log back in any time.', 'Log out');
+      if (!yes) return;
+      const result = await authRepo.signOut();
+      // On success the root layout swaps to the login screen by itself.
+      if (!result.ok) showToast(result.error);
+    });
 
   return (
     <Screen>
@@ -112,26 +119,45 @@ export default function DeckListScreen() {
               <Text style={styles.deckCount}>{cardsLabel(deck.cardCount)}</Text>
             </Pressable>
             <SmallButton label="Rename" name={deck.name} onPress={() => setRenamingId(deck.id)} />
-            <SmallButton label="Delete" name={deck.name} onPress={() => onDelete(deck)} danger />
+            <SmallButton
+              label="Delete"
+              name={deck.name}
+              onPress={() => onDelete(deck)}
+              disabled={deleting.busy}
+              danger
+            />
           </View>
         ),
       )}
 
       <View style={styles.footer}>
-        <Button title="Log out" variant="secondary" onPress={onLogOut} />
+        <Button
+          title="Log out"
+          variant="secondary"
+          onPress={onLogOut}
+          loading={loggingOut.busy}
+        />
       </View>
     </Screen>
   );
 }
 
-function SmallButton(props: { label: string; name: string; onPress: () => void; danger?: boolean }) {
+function SmallButton(props: {
+  label: string;
+  name: string;
+  onPress: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${props.label} ${props.name}`}
+      accessibilityState={{ disabled: !!props.disabled }}
+      disabled={props.disabled}
       onPress={props.onPress}
       hitSlop={8}
-      style={styles.small}
+      style={[styles.small, props.disabled && styles.inactive]}
     >
       <Text style={[styles.smallText, props.danger && styles.dangerText]}>{props.label}</Text>
     </Pressable>
@@ -158,5 +184,6 @@ const styles = StyleSheet.create({
   small: { paddingVertical: 6, paddingHorizontal: 4 },
   smallText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
   dangerText: { color: colors.danger },
+  inactive: { opacity: 0.5 },
   footer: { marginTop: 24 },
 });
