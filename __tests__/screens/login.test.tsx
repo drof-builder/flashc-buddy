@@ -1,0 +1,56 @@
+import { fireEvent, render, screen } from '@testing-library/react-native';
+
+import { authRepo } from '@/data/authRepo';
+
+import LoginScreen from '@/app/(auth)/login';
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ replace: jest.fn(), push: jest.fn(), back: jest.fn() }),
+  Link: ({ children }: { children: React.ReactNode }) => {
+    const { Text } = jest.requireActual('react-native');
+    return <Text>{children}</Text>;
+  },
+}));
+jest.mock('@/data/authRepo', () => ({
+  authRepo: { signIn: jest.fn(), resendConfirmation: jest.fn() },
+}));
+jest.mock('@/ui/Toast', () => ({ showToast: jest.fn() }));
+
+const signIn = authRepo.signIn as jest.Mock;
+const resend = authRepo.resendConfirmation as jest.Mock;
+
+async function logIn(email: string, password: string) {
+  await fireEvent.changeText(screen.getByLabelText('Email'), email);
+  await fireEvent.changeText(screen.getByLabelText('Password'), password);
+  await fireEvent.press(screen.getByRole('button', { name: 'Log in' }));
+}
+
+beforeEach(() => jest.clearAllMocks());
+
+it('shows the wrong-credentials message', async () => {
+  signIn.mockResolvedValue({ ok: false, error: 'Incorrect email or password.' });
+  await render(<LoginScreen />);
+  await logIn('me@example.com', 'wrongpass');
+
+  expect(await screen.findByText('Incorrect email or password.')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Resend email' })).toBeNull();
+});
+
+it('offers to resend the confirmation email when not confirmed', async () => {
+  signIn.mockResolvedValue({ ok: false, error: 'Please confirm your email first' });
+  resend.mockResolvedValue({ ok: true, data: undefined });
+  await render(<LoginScreen />);
+  await logIn('me@example.com', 'password1');
+
+  expect(await screen.findByText('Please confirm your email first')).toBeTruthy();
+  await fireEvent.press(screen.getByRole('button', { name: 'Resend email' }));
+  expect(resend).toHaveBeenCalledWith('me@example.com');
+});
+
+it('does not call signIn with an empty password', async () => {
+  await render(<LoginScreen />);
+  await logIn('me@example.com', '');
+
+  expect(screen.getByText('Enter your password.')).toBeTruthy();
+  expect(signIn).not.toHaveBeenCalled();
+});
