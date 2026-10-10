@@ -10,6 +10,7 @@ export const MESSAGES = {
   tooManyEmails: 'Too many emails sent. Please wait a minute and try again.',
   deckNotFound: 'This deck no longer exists.',
   cardNotFound: 'This card no longer exists.',
+  googlePlayServices: 'Google sign-in needs Google Play services on this phone. Use email instead.',
   generic: 'Something went wrong. Please try again.',
 } as const;
 

@@ -94,3 +94,20 @@ For "offline" items, turn on **airplane mode**.
 - `npm run typecheck` — passing
 - `npm run lint` — passing
 - `npx expo export --platform android` — bundles (1324 modules)
+
+## Google sign-in (spec: docs/superpowers/specs/2026-10-11-google-sign-in-design.md)
+Needs the **development build** (or an APK from version 1.1.0) — Expo Go hides the button.
+
+| # | Criterion | Auto | Phone |
+|---|---|---|---|
+| G1.1 | "Continue with Google" above the email form on Log in and Sign up, with an "or" line | ✅ | ✅ 2026-10-11 |
+| G1.2 | Choosing an account lands on the deck list; no email confirmation | ✅ (repo) | ✅ 2026-10-11 |
+| G1.3 | Same address as an existing email account → same account, same decks | — | ☐ |
+| G1.4 | Closing the picker shows nothing | ✅ | ☐ |
+| G1.5 | Airplane mode → "No connection. Try again when you're online." | ✅ | ☐ |
+| G1.6 | Button shows a spinner while signing in; double tap does nothing extra | ✅ | ☐ |
+| G2.1 | After Log out, the next "Continue with Google" shows the account picker again | ✅ | ☐ |
+| G2.2 | Sign in with Google, fully close the app, reopen it, Log out, then "Continue with Google" → the picker shows | ✅ | ☐ |
+| G.3 | In Expo Go the Google button is hidden and email still works | ✅ | ☐ |
+
+_Phone test 2026-10-11 (development build): install, connect via QR, and Google sign-in confirmed working. Other Google rows not yet reported._

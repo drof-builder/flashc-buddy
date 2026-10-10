@@ -16,8 +16,9 @@ jest.mock('expo-router', () => ({
     canGoBack: () => mockCanGoBack,
   }),
 }));
+jest.mock('@/data/googleAuth', () => ({ isGoogleSignInAvailable: () => true }));
 jest.mock('@/data/authRepo', () => ({
-  authRepo: { signIn: jest.fn(), resendConfirmation: jest.fn() },
+  authRepo: { signIn: jest.fn(), resendConfirmation: jest.fn(), signInWithGoogle: jest.fn() },
 }));
 jest.mock('@/ui/Toast', () => ({ showToast: jest.fn() }));
 
@@ -85,4 +86,11 @@ it('resends to the email that needs confirming, then waits 60 s before allowing 
   expect(resend).toHaveBeenCalledWith('me@example.com');
   const button = await screen.findByRole('button', { name: 'Resend email (60s)' });
   expect(button).toBeDisabled();
+});
+
+it('offers "Continue with Google" above the email form', async () => {
+  await render(<LoginScreen />);
+
+  expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeTruthy();
+  expect(screen.getByLabelText('Email')).toBeTruthy();
 });
