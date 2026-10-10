@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text } from 'react-native';
 
 import { authRepo } from '@/data/authRepo';
+import { MESSAGES } from '@/data/errors';
 import { parseAuthLink } from '@/domain/authLink';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { goToLogin } from '@/features/auth/goToLogin';
@@ -13,10 +14,12 @@ import { Button } from '@/ui/Button';
 import { Screen } from '@/ui/Screen';
 import { colors } from '@/ui/theme';
 
+const NO_LINK = 'This link is not valid. Open the latest email again.';
+
 export default function AuthCallbackScreen() {
   const router = useRouter();
   const url = Linking.useLinkingURL();
-  const { setRecovering } = useAuth();
+  const { status, beginReset, endReset } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const handled = useRef<string | null>(null);
 
@@ -24,32 +27,49 @@ export default function AuthCallbackScreen() {
     if (!url || handled.current === url) return;
     handled.current = url;
 
-    // Mark a reset BEFORE signing in, so the app opens "Set new password",
-    // not the decks, the moment the session appears.
+    // Mark the reset BEFORE signing in, so the app opens "Set new password",
+    // not the decks, the moment the link's session appears.
     const link = parseAuthLink(url);
     const isReset = link.kind === 'session' && link.type === 'recovery';
-    if (isReset) setRecovering(true);
+    if (isReset) beginReset();
 
-    authRepo.completeAuthLink(url).then((result) => {
-      if (!result.ok) {
-        if (isReset) setRecovering(false);
-        setError(result.error);
-        return;
-      }
-      router.replace(result.data === 'recovery' ? '/set-password' : '/');
-    });
-  }, [url, router, setRecovering]);
+    authRepo
+      .completeAuthLink(url)
+      .then((result) => {
+        if (!result.ok) {
+          if (isReset) endReset();
+          setError(result.error);
+          return;
+        }
+        router.replace(result.data === 'recovery' ? '/set-password' : '/');
+      })
+      .catch(() => {
+        if (isReset) endReset();
+        setError(MESSAGES.generic);
+      });
+  }, [url, router, beginReset, endReset]);
 
+  // Opened without a link (e.g. restored onto this screen): nothing to do.
+  const message = error ?? (url ? null : NO_LINK);
+
+  if (!message) {
+    return (
+      <Screen>
+        <ActivityIndicator size="large" style={styles.spinner} />
+      </Screen>
+    );
+  }
+
+  // Always leave a way out: signed-in users go back to their decks.
+  const signedIn = status === 'signedIn';
   return (
     <Screen>
-      {error ? (
-        <>
-          <Text style={styles.error}>{error}</Text>
-          <Button title="Back to log in" variant="secondary" onPress={() => goToLogin(router)} />
-        </>
-      ) : (
-        <ActivityIndicator size="large" style={styles.spinner} />
-      )}
+      <Text style={styles.error}>{message}</Text>
+      <Button
+        title={signedIn ? 'Back to decks' : 'Back to log in'}
+        variant="secondary"
+        onPress={() => (signedIn ? router.replace('/') : goToLogin(router))}
+      />
     </Screen>
   );
 }

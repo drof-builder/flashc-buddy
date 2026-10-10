@@ -333,8 +333,22 @@ describe('authRepo.completeAuthLink', () => {
     });
   });
 
+  it('a network failure is reported as no connection, not as an expired link', async () => {
+    auth.setSession.mockResolvedValue({
+      data: {},
+      error: { name: 'AuthRetryableFetchError', message: 'Failed to fetch', status: 0 },
+    });
+    await expect(authRepo.completeAuthLink(`${link}&type=recovery`)).resolves.toEqual({
+      ok: false,
+      error: NO_CONNECTION,
+    });
+  });
+
   it('Supabase refusing the tokens is treated as expired', async () => {
-    auth.setSession.mockResolvedValue({ data: {}, error: { code: 'session_expired' } });
+    auth.setSession.mockResolvedValue({
+      data: {},
+      error: { name: 'AuthApiError', code: 'session_expired', status: 403 },
+    });
     await expect(authRepo.completeAuthLink(`${link}&type=recovery`)).resolves.toEqual({
       ok: false,
       error: 'This link has expired. Request a new one.',

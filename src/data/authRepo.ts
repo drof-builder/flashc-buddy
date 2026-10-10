@@ -150,11 +150,22 @@ async function completeAuthLink(url: string): Promise<Result<'recovery' | 'signu
       access_token: link.accessToken,
       refresh_token: link.refreshToken,
     });
-    if (error) return { ok: false, error: MESSAGES.linkExpired };
+    if (error) {
+      // Only a real refusal from Supabase means the link is bad; a network
+      // problem must not send the user off to request another email.
+      return { ok: false, error: isRejection(error) ? MESSAGES.linkExpired : toUserMessage(error) };
+    }
     return { ok: true, data: link.type };
   } catch (error) {
     return { ok: false, error: toUserMessage(error) };
   }
+}
+
+/** True when Supabase answered and said no (4xx), as opposed to a network failure. */
+function isRejection(error: unknown): boolean {
+  const e = error as { name?: unknown; status?: unknown };
+  if (e.name === 'AuthApiError') return true;
+  return typeof e.status === 'number' && e.status >= 400 && e.status < 500;
 }
 
 /** Sets a new password for the signed-in user (after a password-reset link). */

@@ -16,7 +16,9 @@ email, so I can get back into my account.
 **R2 — Set a new password.**
 - The email link opens FlashC Buddy on "Set new password" (new + confirm, 8+ characters).
 - Success → toast "Password updated." → deck list.
-- Expired or used link → "This link has expired. Request a new one." + a button to
+- Expired or used link → "This link has expired. Request a new one." + "Back to log in"
+  (signed out; Log in has "Forgot password?") or "Back to decks" (signed in). Supabase's
+  error link carries no type, so reset and confirmation errors look the same. Was: a button to
   "Forgot password?".
 - "Cancel" logs out, so a half-finished reset never leaves the user signed in.
 

@@ -4,12 +4,12 @@ import SetPasswordScreen from '@/app/(recovery)/set-password';
 import { authRepo } from '@/data/authRepo';
 import { showToast } from '@/ui/Toast';
 
-const mockSetRecovering = jest.fn();
+const mockEndReset = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: jest.fn(), push: jest.fn(), back: jest.fn() }),
 }));
 jest.mock('@/features/auth/AuthProvider', () => ({
-  useAuth: () => ({ status: 'recovering', setRecovering: mockSetRecovering }),
+  useAuth: () => ({ status: 'recovering', beginReset: jest.fn(), endReset: mockEndReset }),
 }));
 jest.mock('@/data/authRepo', () => ({
   authRepo: { updatePassword: jest.fn(), signOut: jest.fn() },
@@ -43,7 +43,7 @@ it('saves the password, confirms, and ends the reset (app goes to the decks)', a
 
   expect(updatePassword).toHaveBeenCalledWith('newpassword1');
   expect(showToast).toHaveBeenCalledWith('Password updated.');
-  expect(mockSetRecovering).toHaveBeenCalledWith(false);
+  expect(mockEndReset).toHaveBeenCalled();
 });
 
 it('shows a server error and stays on the screen', async () => {
@@ -55,7 +55,7 @@ it('shows a server error and stays on the screen', async () => {
   await fill('newpassword1', 'newpassword1');
 
   expect(await screen.findByText('Choose a password different from your old one.')).toBeTruthy();
-  expect(mockSetRecovering).not.toHaveBeenCalled();
+  expect(mockEndReset).not.toHaveBeenCalled();
 });
 
 it('Cancel logs out so a half-finished reset never leaves you signed in', async () => {
@@ -65,5 +65,5 @@ it('Cancel logs out so a half-finished reset never leaves you signed in', async 
   await fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
 
   expect(signOut).toHaveBeenCalled();
-  expect(mockSetRecovering).toHaveBeenCalledWith(false);
+  expect(mockEndReset).toHaveBeenCalled();
 });

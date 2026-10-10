@@ -58,6 +58,10 @@ describe('parseAuthLink', () => {
     expect(parseAuthLink('')).toEqual({ kind: 'invalid' });
   });
 
+  it('treats a malformed link as invalid instead of crashing', () => {
+    expect(parseAuthLink(`${base}#a=%E0%A4%A&access_token=%`)).toEqual({ kind: 'invalid' });
+  });
+
   it('decodes URL-encoded tokens', () => {
     expect(parseAuthLink(`${base}#access_token=a%2Bb&refresh_token=c%3Dd&type=recovery`)).toEqual({
       kind: 'session',

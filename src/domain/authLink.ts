@@ -26,7 +26,12 @@ function readParams(url: string): Map<string, string> {
 }
 
 export function parseAuthLink(url: string): AuthLink {
-  const params = readParams(url);
+  let params: Map<string, string>;
+  try {
+    params = readParams(url);
+  } catch {
+    return { kind: 'invalid' }; // malformed %-encoding: any app can open our scheme
+  }
 
   const errorCode = params.get('error_code') || params.get('error');
   if (errorCode) return { kind: 'error', code: errorCode };

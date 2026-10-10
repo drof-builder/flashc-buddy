@@ -14,7 +14,7 @@ import { showToast } from '@/ui/Toast';
 import { useBusy } from '@/ui/useBusy';
 
 export default function SetPasswordScreen() {
-  const { setRecovering } = useAuth();
+  const { endReset } = useAuth();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -38,13 +38,13 @@ export default function SetPasswordScreen() {
         return;
       }
       showToast('Password updated.');
-      setRecovering(false); // the root layout now shows the decks
+      endReset(); // the root layout now shows the decks
     });
 
   const onCancel = () =>
     cancel.run(async () => {
       await authRepo.signOut();
-      setRecovering(false);
+      endReset();
     });
 
   return (
