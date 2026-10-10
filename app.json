@@ -38,6 +38,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f2b0f2ae-59b7-4f0d-b7e2-91e65a8aa493"
+      }
+    },
+    "owner": "drof-builder"
   }
 }
