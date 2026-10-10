@@ -218,6 +218,8 @@ describe('authRepo.signInWithGoogle', () => {
       ok: false,
       error: 'Something went wrong. Please try again.',
     });
+    // so a retry shows the picker instead of reusing the same failing account
+    expect(googleSignOut).toHaveBeenCalled();
   });
 
   it('signs in to Supabase with the Google ID token', async () => {
@@ -246,5 +248,13 @@ describe('authRepo.signOut and Google', () => {
     auth.signOut.mockResolvedValue({ error: null });
     await authRepo.signOut();
     expect(googleSignOut).toHaveBeenCalled();
+  });
+
+  it('ends the app session first, so a slow Google call can never block logging out', async () => {
+    auth.signOut.mockResolvedValue({ error: null });
+    await authRepo.signOut();
+    expect(auth.signOut.mock.invocationCallOrder[0]).toBeLessThan(
+      googleSignOut.mock.invocationCallOrder[0],
+    );
   });
 });

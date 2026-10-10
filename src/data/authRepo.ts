@@ -51,7 +51,14 @@ async function forgetSavedLogin(): Promise<void> {
  * otherwise fail to refresh and return early WITHOUT logging out.
  */
 async function signOut(): Promise<Result<void>> {
-  await signOutOfGoogle(); // so the Google account picker shows next time
+  const result = await endSession();
+  // After the app session is gone, forget the Google account so the picker
+  // shows next time (shared phone). Never throws, so it can't undo the logout.
+  await signOutOfGoogle();
+  return result;
+}
+
+async function endSession(): Promise<Result<void>> {
   try {
     if (await isOnline()) {
       const { error } = await supabase.auth.signOut();
@@ -87,10 +94,9 @@ async function signInWithGoogle(): Promise<Result<'signedIn' | 'cancelled'>> {
   const google = await getGoogleIdToken();
   if (google.kind === 'cancelled') return { ok: true, data: 'cancelled' };
   if (google.kind === 'error') {
-    const error = isPlayServicesError(google.error)
-      ? MESSAGES.googlePlayServices
-      : toUserMessage(google.error);
-    return { ok: false, error };
+    if (isPlayServicesError(google.error)) return { ok: false, error: MESSAGES.googlePlayServices };
+    await signOutOfGoogle(); // a retry then shows the picker instead of the same account
+    return { ok: false, error: toUserMessage(google.error) };
   }
   try {
     const { error } = await supabase.auth.signInWithIdToken({

@@ -120,6 +120,18 @@ describe('signOutOfGoogle', () => {
     expect(google.signOut).toHaveBeenCalled();
   });
 
+  it('after an app restart, sets Google up before signing out (native signOut needs it)', async () => {
+    google.signOut.mockResolvedValue(null);
+    const auth = load(); // fresh start: nothing configured yet
+
+    await auth.signOutOfGoogle();
+
+    expect(google.configure).toHaveBeenCalledWith({ webClientId: 'web-client-id' });
+    expect(google.configure.mock.invocationCallOrder[0]).toBeLessThan(
+      google.signOut.mock.invocationCallOrder[0],
+    );
+  });
+
   it('never throws, even if Google fails', async () => {
     google.signOut.mockRejectedValue(new Error('boom'));
     await expect(load().signOutOfGoogle()).resolves.toBeUndefined();

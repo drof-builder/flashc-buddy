@@ -30,6 +30,16 @@ function loadLib(): GoogleSignInLib | null {
   return lib;
 }
 
+/**
+ * Google must be configured in THIS run of the app before any call — including
+ * signOut, which otherwise silently does nothing after an app restart.
+ */
+function ensureConfigured(google: GoogleSignInLib): void {
+  if (configured) return;
+  google.GoogleSignin.configure({ webClientId: webClientId() });
+  configured = true;
+}
+
 /** False in Expo Go or when the client ID is missing: the button is then hidden. */
 export function isGoogleSignInAvailable(): boolean {
   return webClientId() !== '' && loadLib() !== null;
@@ -42,10 +52,7 @@ export async function getGoogleIdToken(): Promise<GoogleTokenResult> {
     return { kind: 'error', error: new Error('Google sign-in is not available here') };
   }
   try {
-    if (!configured) {
-      google.GoogleSignin.configure({ webClientId: webClientId() });
-      configured = true;
-    }
+    ensureConfigured(google);
     await google.GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
     const response = await google.GoogleSignin.signIn();
     if (google.isCancelledResponse(response)) return { kind: 'cancelled' };
@@ -63,8 +70,9 @@ export async function getGoogleIdToken(): Promise<GoogleTokenResult> {
 /** Forgets the chosen Google account so the picker shows next time. Never throws. */
 export async function signOutOfGoogle(): Promise<void> {
   const google = loadLib();
-  if (!google) return;
+  if (!google || !webClientId()) return;
   try {
+    ensureConfigured(google);
     await google.GoogleSignin.signOut();
   } catch {
     // Nothing to undo: the app session is what matters.

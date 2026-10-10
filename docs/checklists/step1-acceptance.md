@@ -107,4 +107,5 @@ Needs the **development build** (or an APK from version 1.1.0) — Expo Go hides
 | G1.5 | Airplane mode → "No connection. Try again when you're online." | ✅ | ☐ |
 | G1.6 | Button shows a spinner while signing in; double tap does nothing extra | ✅ | ☐ |
 | G2.1 | After Log out, the next "Continue with Google" shows the account picker again | ✅ | ☐ |
+| G2.2 | Sign in with Google, fully close the app, reopen it, Log out, then "Continue with Google" → the picker shows | ✅ | ☐ |
 | G.3 | In Expo Go the Google button is hidden and email still works | ✅ | ☐ |

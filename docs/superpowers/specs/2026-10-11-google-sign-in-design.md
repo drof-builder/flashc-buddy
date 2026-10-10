@@ -91,7 +91,7 @@ phone; then `npx expo start` + reload as before. A new dev build is needed only
 when native dependencies change.
 
 **D4 — Account linking by email** relies on Supabase's automatic linking of
-identities with the same verified email. No app code needed; verified in testing.
+identities with the same verified email. No app code needed; to be verified on the phone (checklist G1.3).
 
 ## 5. External setup
 
