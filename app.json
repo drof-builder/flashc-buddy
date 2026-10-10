@@ -33,6 +33,12 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.461198740095-g7hi1hm6r0rnmu2scntivid46anp2b9m"
+        }
       ]
     ],
     "experiments": {
