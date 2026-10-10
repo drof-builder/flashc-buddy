@@ -86,6 +86,7 @@ export default function LoginScreen() {
         />
       ) : null}
       <Button title="Log in" onPress={onSubmit} loading={login.busy} />
+      <TextLink title="Forgot password?" onPress={() => router.push('/forgot-password')} />
       <TextLink title="New here? Create an account" onPress={() => router.push('/signup')} />
     </Screen>
   );

@@ -35,8 +35,8 @@ export default function CheckEmailScreen() {
     <Screen>
       <Text style={styles.title}>Check your email</Text>
       <Text style={styles.body}>
-        We sent a confirmation link to {email || 'your email address'}. Open it to confirm your
-        account. It may open in your phone&apos;s browser — after that, come back here and log in.
+        We sent a confirmation link to {email || 'your email address'}. Open it on this
+        phone: it confirms your account and signs you in to FlashC Buddy.
       </Text>
       {email ? (
         <Button

@@ -1,25 +1,42 @@
 // Knows whether the user is logged in and shares that with the whole app.
-import { createContext, type ReactNode, useContext, useEffect, useState } from 'react';
+// 'recovering' = signed in from a password-reset link but no new password yet:
+// the app shows "Set new password" before anything else.
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 
 import { authRepo } from '@/data/authRepo';
 
-export type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
+export type AuthStatus = 'loading' | 'signedOut' | 'signedIn' | 'recovering';
 
-const AuthContext = createContext<AuthStatus>('loading');
+type AuthContextValue = { status: AuthStatus; setRecovering: (recovering: boolean) => void };
+
+const AuthContext = createContext<AuthContextValue>({
+  status: 'loading',
+  setRecovering: () => {},
+});
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<AuthStatus>('loading');
+  const [session, setSession] = useState<'loading' | 'signedOut' | 'signedIn'>('loading');
+  const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
     // Fires once at startup with the saved session, then on every log in / out.
     return authRepo.onSessionChange((signedIn) => {
-      setStatus(signedIn ? 'signedIn' : 'signedOut');
+      setSession(signedIn ? 'signedIn' : 'signedOut');
+      if (!signedIn) setRecovering(false); // signing out always ends a reset
     });
   }, []);
 
-  return <AuthContext.Provider value={status}>{children}</AuthContext.Provider>;
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      status: session === 'signedIn' && recovering ? 'recovering' : session,
+      setRecovering,
+    }),
+    [session, recovering],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth(): { status: AuthStatus } {
-  return { status: useContext(AuthContext) };
+export function useAuth(): AuthContextValue {
+  return useContext(AuthContext);
 }

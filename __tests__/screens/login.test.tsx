@@ -94,3 +94,10 @@ it('offers "Continue with Google" above the email form', async () => {
   expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeTruthy();
   expect(screen.getByLabelText('Email')).toBeTruthy();
 });
+
+it('has a "Forgot password?" link to the reset screen', async () => {
+  await render(<LoginScreen />);
+  await fireEvent.press(screen.getByRole('link', { name: 'Forgot password?' }));
+
+  expect(mockPush).toHaveBeenCalledWith('/forgot-password');
+});

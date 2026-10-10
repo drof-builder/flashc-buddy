@@ -16,17 +16,21 @@ function RootNavigator() {
     );
   }
 
-  const signedIn = status === 'signedIn';
   // Protected groups: when `guard` turns false, that group's screens and their
   // history are removed — so after logging out, Back can't return to decks.
+  // auth-callback (email links) is reachable in every state.
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={signedIn}>
+      <Stack.Protected guard={status === 'signedIn'}>
         <Stack.Screen name="(main)" />
       </Stack.Protected>
-      <Stack.Protected guard={!signedIn}>
+      <Stack.Protected guard={status === 'recovering'}>
+        <Stack.Screen name="(recovery)" />
+      </Stack.Protected>
+      <Stack.Protected guard={status === 'signedOut'}>
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
+      <Stack.Screen name="auth-callback" />
     </Stack>
   );
 }
