@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Result } from '@/domain/types';
 
 import { MESSAGES, toUserMessage } from './errors';
+import { getGoogleIdToken, isPlayServicesError, signOutOfGoogle } from './googleAuth';
 import { isOnline } from './network';
 import { AUTH_STORAGE_KEY, supabase } from './supabaseClient';
 
@@ -50,6 +51,7 @@ async function forgetSavedLogin(): Promise<void> {
  * otherwise fail to refresh and return early WITHOUT logging out.
  */
 async function signOut(): Promise<Result<void>> {
+  await signOutOfGoogle(); // so the Google account picker shows next time
   try {
     if (await isOnline()) {
       const { error } = await supabase.auth.signOut();
@@ -74,6 +76,36 @@ async function resendConfirmation(email: string): Promise<Result<void>> {
   }
 }
 
+/**
+ * "Continue with Google": Google picks the account and vouches for the email,
+ * Supabase signs in (or creates) the user from Google's ID token. Same email as
+ * an existing account = same account (Supabase links verified emails).
+ * `cancelled` = the user closed the picker; show nothing.
+ */
+async function signInWithGoogle(): Promise<Result<'signedIn' | 'cancelled'>> {
+  if (!(await isOnline())) return { ok: false, error: MESSAGES.noConnection };
+  const google = await getGoogleIdToken();
+  if (google.kind === 'cancelled') return { ok: true, data: 'cancelled' };
+  if (google.kind === 'error') {
+    const error = isPlayServicesError(google.error)
+      ? MESSAGES.googlePlayServices
+      : toUserMessage(google.error);
+    return { ok: false, error };
+  }
+  try {
+    const { error } = await supabase.auth.signInWithIdToken({
+      provider: 'google',
+      token: google.idToken,
+    });
+    if (!error) return { ok: true, data: 'signedIn' };
+    await signOutOfGoogle(); // let the user pick again on the next try
+    return { ok: false, error: toUserMessage(error) };
+  } catch (error) {
+    await signOutOfGoogle();
+    return { ok: false, error: toUserMessage(error) };
+  }
+}
+
 /** Calls back with true/false whenever login state changes (including at startup). */
 function onSessionChange(callback: (signedIn: boolean) => void): () => void {
   const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -91,4 +123,11 @@ function onSessionChange(callback: (signedIn: boolean) => void): () => void {
   return () => data.subscription.unsubscribe();
 }
 
-export const authRepo = { signUp, signIn, signOut, resendConfirmation, onSessionChange };
+export const authRepo = {
+  signUp,
+  signIn,
+  signInWithGoogle,
+  signOut,
+  resendConfirmation,
+  onSessionChange,
+};

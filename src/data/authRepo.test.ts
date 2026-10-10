@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { authRepo } from './authRepo';
+import { getGoogleIdToken, isPlayServicesError, signOutOfGoogle } from './googleAuth';
 import { isOnline } from './network';
 import { supabase } from './supabaseClient';
 
@@ -12,11 +13,17 @@ jest.mock('./supabaseClient', () => ({
       signInWithPassword: jest.fn(),
       signOut: jest.fn(),
       resend: jest.fn(),
+      signInWithIdToken: jest.fn(),
       onAuthStateChange: jest.fn(),
     },
   },
 }));
 jest.mock('./network', () => ({ isOnline: jest.fn() }));
+jest.mock('./googleAuth', () => ({
+  getGoogleIdToken: jest.fn(),
+  isPlayServicesError: jest.fn(),
+  signOutOfGoogle: jest.fn(),
+}));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(), removeItem: jest.fn() },
@@ -25,11 +32,16 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 const storage = AsyncStorage as unknown as Record<string, jest.Mock>;
 const auth = supabase.auth as unknown as Record<string, jest.Mock>;
 const online = isOnline as jest.Mock;
+const googleToken = getGoogleIdToken as jest.Mock;
+const playServicesError = isPlayServicesError as jest.Mock;
+const googleSignOut = signOutOfGoogle as jest.Mock;
 const NO_CONNECTION = "No connection. Try again when you're online.";
 
 beforeEach(() => {
   jest.clearAllMocks();
   online.mockResolvedValue(true);
+  playServicesError.mockReturnValue(false);
+  googleSignOut.mockResolvedValue(undefined);
 });
 
 describe('authRepo.signUp', () => {
@@ -173,5 +185,66 @@ describe('authRepo.onSessionChange', () => {
     await listener('INITIAL_SESSION', null);
 
     expect(cb).toHaveBeenCalledWith(false);
+  });
+});
+
+describe('authRepo.signInWithGoogle', () => {
+  it('offline: shows the no-connection error without opening the Google picker', async () => {
+    online.mockResolvedValue(false);
+    await expect(authRepo.signInWithGoogle()).resolves.toEqual({ ok: false, error: NO_CONNECTION });
+    expect(googleToken).not.toHaveBeenCalled();
+  });
+
+  it('cancelled picker: nothing to show, Supabase not called', async () => {
+    googleToken.mockResolvedValue({ kind: 'cancelled' });
+    await expect(authRepo.signInWithGoogle()).resolves.toEqual({ ok: true, data: 'cancelled' });
+    expect(auth.signInWithIdToken).not.toHaveBeenCalled();
+  });
+
+  it('no Google Play services: explains and suggests email', async () => {
+    const error = { code: 'PLAY_SERVICES_NOT_AVAILABLE' };
+    googleToken.mockResolvedValue({ kind: 'error', error });
+    playServicesError.mockReturnValue(true);
+    await expect(authRepo.signInWithGoogle()).resolves.toEqual({
+      ok: false,
+      error: 'Google sign-in needs Google Play services on this phone. Use email instead.',
+    });
+  });
+
+  it('other Google errors: generic message', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    googleToken.mockResolvedValue({ kind: 'error', error: new Error('DEVELOPER_ERROR') });
+    await expect(authRepo.signInWithGoogle()).resolves.toEqual({
+      ok: false,
+      error: 'Something went wrong. Please try again.',
+    });
+  });
+
+  it('signs in to Supabase with the Google ID token', async () => {
+    googleToken.mockResolvedValue({ kind: 'token', idToken: 'tok' });
+    auth.signInWithIdToken.mockResolvedValue({ data: { session: {} }, error: null });
+
+    await expect(authRepo.signInWithGoogle()).resolves.toEqual({ ok: true, data: 'signedIn' });
+    expect(auth.signInWithIdToken).toHaveBeenCalledWith({ provider: 'google', token: 'tok' });
+  });
+
+  it('Supabase rejects the token: generic message and Google is signed out so the picker shows next time', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    googleToken.mockResolvedValue({ kind: 'token', idToken: 'tok' });
+    auth.signInWithIdToken.mockResolvedValue({ data: {}, error: { code: 'provider_disabled' } });
+
+    await expect(authRepo.signInWithGoogle()).resolves.toEqual({
+      ok: false,
+      error: 'Something went wrong. Please try again.',
+    });
+    expect(googleSignOut).toHaveBeenCalled();
+  });
+});
+
+describe('authRepo.signOut and Google', () => {
+  it('also forgets the Google account, so the picker shows next time', async () => {
+    auth.signOut.mockResolvedValue({ error: null });
+    await authRepo.signOut();
+    expect(googleSignOut).toHaveBeenCalled();
   });
 });
