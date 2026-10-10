@@ -5,6 +5,7 @@ import { StyleSheet, Text } from 'react-native';
 import { authRepo } from '@/data/authRepo';
 import { goToLogin } from '@/features/auth/goToLogin';
 import { validateEmail, validatePassword, validatePasswordsMatch } from '@/domain/validation';
+import { GoogleButton } from '@/features/auth/GoogleButton';
 import { Button } from '@/ui/Button';
 import { Screen } from '@/ui/Screen';
 import { TextField } from '@/ui/TextField';
@@ -44,6 +45,7 @@ export default function SignUpScreen() {
 
   return (
     <Screen>
+      <GoogleButton />
       <TextField
         label="Email"
         value={email}

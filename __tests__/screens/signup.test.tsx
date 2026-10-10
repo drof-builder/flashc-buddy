@@ -16,6 +16,7 @@ jest.mock('expo-router', () => ({
     canGoBack: () => mockCanGoBack,
   }),
 }));
+jest.mock('@/data/googleAuth', () => ({ isGoogleSignInAvailable: () => false }));
 jest.mock('@/data/authRepo', () => ({ authRepo: { signUp: jest.fn() } }));
 
 const signUp = authRepo.signUp as jest.Mock;
