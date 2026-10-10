@@ -1,12 +1,16 @@
 // Sign up, log in, log out. Never throws: every function returns a Result.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { parseAuthLink } from '@/domain/authLink';
 import type { Result } from '@/domain/types';
 
 import { MESSAGES, toUserMessage } from './errors';
 import { getGoogleIdToken, isPlayServicesError, signOutOfGoogle } from './googleAuth';
 import { isOnline } from './network';
 import { AUTH_STORAGE_KEY, supabase } from './supabaseClient';
+
+/** Where email links (confirmation, password reset) send the user back to: the app. */
+export const AUTH_REDIRECT_URL = 'flashcbuddy://auth-callback';
 
 const ok: Result<void> = { ok: true, data: undefined };
 const fail = (error: unknown): Result<void> => ({ ok: false, error: toUserMessage(error) });
@@ -15,7 +19,11 @@ const offline: Result<void> = { ok: false, error: MESSAGES.noConnection };
 async function signUp(email: string, password: string): Promise<Result<void>> {
   if (!(await isOnline())) return offline;
   try {
-    const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: { emailRedirectTo: AUTH_REDIRECT_URL },
+    });
     if (error) return fail(error);
     // With email confirmation on, Supabase hides "already registered" (so attackers
     // can't probe for accounts) by returning a user with no identities instead.
@@ -112,6 +120,54 @@ async function signInWithGoogle(): Promise<Result<'signedIn' | 'cancelled'>> {
   }
 }
 
+/**
+ * Sends a password-reset email whose link opens the app. Supabase answers the
+ * same whether or not the email has an account, so nobody can probe for accounts.
+ */
+async function requestPasswordReset(email: string): Promise<Result<void>> {
+  if (!(await isOnline())) return offline;
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: AUTH_REDIRECT_URL,
+    });
+    return error ? fail(error) : ok;
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/**
+ * Signs in from a tapped email link (flashcbuddy://auth-callback#…). Tells the
+ * caller whether it was a password reset (show "Set new password") or a
+ * sign-up confirmation. Any bad or expired link gets the same clear message.
+ */
+async function completeAuthLink(url: string): Promise<Result<'recovery' | 'signup'>> {
+  const link = parseAuthLink(url);
+  if (link.kind !== 'session') return { ok: false, error: MESSAGES.linkExpired };
+  if (!(await isOnline())) return { ok: false, error: MESSAGES.noConnection };
+  try {
+    const { error } = await supabase.auth.setSession({
+      access_token: link.accessToken,
+      refresh_token: link.refreshToken,
+    });
+    if (error) return { ok: false, error: MESSAGES.linkExpired };
+    return { ok: true, data: link.type };
+  } catch (error) {
+    return { ok: false, error: toUserMessage(error) };
+  }
+}
+
+/** Sets a new password for the signed-in user (after a password-reset link). */
+async function updatePassword(password: string): Promise<Result<void>> {
+  if (!(await isOnline())) return offline;
+  try {
+    const { error } = await supabase.auth.updateUser({ password });
+    return error ? fail(error) : ok;
+  } catch (error) {
+    return fail(error);
+  }
+}
+
 /** Calls back with true/false whenever login state changes (including at startup). */
 function onSessionChange(callback: (signedIn: boolean) => void): () => void {
   const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -134,6 +190,9 @@ export const authRepo = {
   signIn,
   signInWithGoogle,
   signOut,
+  requestPasswordReset,
+  completeAuthLink,
+  updatePassword,
   resendConfirmation,
   onSessionChange,
 };

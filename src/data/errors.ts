@@ -11,6 +11,9 @@ export const MESSAGES = {
   deckNotFound: 'This deck no longer exists.',
   cardNotFound: 'This card no longer exists.',
   googlePlayServices: 'Google sign-in needs Google Play services on this phone. Use email instead.',
+  linkExpired: 'This link has expired. Request a new one.',
+  samePassword: 'Choose a password different from your old one.',
+  weakPassword: 'Password must be at least 8 characters.',
   generic: 'Something went wrong. Please try again.',
 } as const;
 
@@ -21,6 +24,9 @@ const BY_CODE: Record<string, string> = {
   user_already_exists: MESSAGES.emailTaken,
   email_exists: MESSAGES.emailTaken,
   over_email_send_rate_limit: MESSAGES.tooManyEmails,
+  otp_expired: MESSAGES.linkExpired,
+  same_password: MESSAGES.samePassword,
+  weak_password: MESSAGES.weakPassword,
 };
 
 type ErrorLike = { code?: unknown; name?: unknown; message?: unknown };

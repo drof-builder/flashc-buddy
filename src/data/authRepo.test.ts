@@ -14,6 +14,9 @@ jest.mock('./supabaseClient', () => ({
       signOut: jest.fn(),
       resend: jest.fn(),
       signInWithIdToken: jest.fn(),
+      resetPasswordForEmail: jest.fn(),
+      setSession: jest.fn(),
+      updateUser: jest.fn(),
       onAuthStateChange: jest.fn(),
     },
   },
@@ -62,13 +65,17 @@ describe('authRepo.signUp', () => {
     });
   });
 
-  it('succeeds for a new email and trims it', async () => {
+  it('succeeds for a new email, trims it, and sends the confirmation link to the app', async () => {
     auth.signUp.mockResolvedValue({ data: { user: { identities: [{}] } }, error: null });
     await expect(authRepo.signUp(' me@example.com ', 'password1')).resolves.toEqual({
       ok: true,
       data: undefined,
     });
-    expect(auth.signUp).toHaveBeenCalledWith({ email: 'me@example.com', password: 'password1' });
+    expect(auth.signUp).toHaveBeenCalledWith({
+      email: 'me@example.com',
+      password: 'password1',
+      options: { emailRedirectTo: 'flashcbuddy://auth-callback' },
+    });
   });
 });
 
@@ -256,5 +263,119 @@ describe('authRepo.signOut and Google', () => {
     expect(auth.signOut.mock.invocationCallOrder[0]).toBeLessThan(
       googleSignOut.mock.invocationCallOrder[0],
     );
+  });
+});
+
+describe('authRepo.requestPasswordReset', () => {
+  it('sends a reset email that links back into the app', async () => {
+    auth.resetPasswordForEmail.mockResolvedValue({ data: {}, error: null });
+    await expect(authRepo.requestPasswordReset(' me@example.com ')).resolves.toEqual({
+      ok: true,
+      data: undefined,
+    });
+    expect(auth.resetPasswordForEmail).toHaveBeenCalledWith('me@example.com', {
+      redirectTo: 'flashcbuddy://auth-callback',
+    });
+  });
+
+  it('offline: no request is sent', async () => {
+    online.mockResolvedValue(false);
+    await expect(authRepo.requestPasswordReset('me@example.com')).resolves.toEqual({
+      ok: false,
+      error: NO_CONNECTION,
+    });
+    expect(auth.resetPasswordForEmail).not.toHaveBeenCalled();
+  });
+
+  it('too many emails: explains the wait', async () => {
+    auth.resetPasswordForEmail.mockResolvedValue({
+      data: {},
+      error: { code: 'over_email_send_rate_limit' },
+    });
+    await expect(authRepo.requestPasswordReset('me@example.com')).resolves.toEqual({
+      ok: false,
+      error: 'Too many emails sent. Please wait a minute and try again.',
+    });
+  });
+});
+
+describe('authRepo.completeAuthLink', () => {
+  const link = 'flashcbuddy://auth-callback#access_token=AT&refresh_token=RT';
+
+  it('a password-reset link signs in and reports recovery', async () => {
+    auth.setSession.mockResolvedValue({ data: {}, error: null });
+    await expect(authRepo.completeAuthLink(`${link}&type=recovery`)).resolves.toEqual({
+      ok: true,
+      data: 'recovery',
+    });
+    expect(auth.setSession).toHaveBeenCalledWith({ access_token: 'AT', refresh_token: 'RT' });
+  });
+
+  it('a confirmation link signs in and reports signup', async () => {
+    auth.setSession.mockResolvedValue({ data: {}, error: null });
+    await expect(authRepo.completeAuthLink(`${link}&type=signup`)).resolves.toEqual({
+      ok: true,
+      data: 'signup',
+    });
+  });
+
+  it('an expired link explains and asks for a new one', async () => {
+    await expect(
+      authRepo.completeAuthLink('flashcbuddy://auth-callback#error=access_denied&error_code=otp_expired'),
+    ).resolves.toEqual({ ok: false, error: 'This link has expired. Request a new one.' });
+    expect(auth.setSession).not.toHaveBeenCalled();
+  });
+
+  it('a broken link is treated as expired', async () => {
+    await expect(authRepo.completeAuthLink('flashcbuddy://auth-callback')).resolves.toEqual({
+      ok: false,
+      error: 'This link has expired. Request a new one.',
+    });
+  });
+
+  it('Supabase refusing the tokens is treated as expired', async () => {
+    auth.setSession.mockResolvedValue({ data: {}, error: { code: 'session_expired' } });
+    await expect(authRepo.completeAuthLink(`${link}&type=recovery`)).resolves.toEqual({
+      ok: false,
+      error: 'This link has expired. Request a new one.',
+    });
+  });
+
+  it('offline: explains, no sign-in attempted', async () => {
+    online.mockResolvedValue(false);
+    await expect(authRepo.completeAuthLink(`${link}&type=recovery`)).resolves.toEqual({
+      ok: false,
+      error: NO_CONNECTION,
+    });
+    expect(auth.setSession).not.toHaveBeenCalled();
+  });
+});
+
+describe('authRepo.updatePassword', () => {
+  it('sets the new password', async () => {
+    auth.updateUser.mockResolvedValue({ data: {}, error: null });
+    await expect(authRepo.updatePassword('newpassword1')).resolves.toEqual({
+      ok: true,
+      data: undefined,
+    });
+    expect(auth.updateUser).toHaveBeenCalledWith({ password: 'newpassword1' });
+  });
+
+  it('reports a server error', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    auth.updateUser.mockResolvedValue({ data: {}, error: { code: 'unexpected_failure' } });
+    await expect(authRepo.updatePassword('newpassword1')).resolves.toEqual({
+      ok: false,
+      error: 'Something went wrong. Please try again.',
+    });
+  });
+
+  it('offline: nothing sent', async () => {
+    online.mockResolvedValue(false);
+    await expect(authRepo.updatePassword('newpassword1')).resolves.toEqual({
+      ok: false,
+      error: NO_CONNECTION,
+    });
+    expect(auth.updateUser).not.toHaveBeenCalled();
   });
 });
